@@ -75,12 +75,13 @@ def parse_feed(data: bytes, default_source: str) -> list[dict]:
         title = child_text(el, "title")
         link = child_text(el, "link") or el.get("{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about", "")
         source = child_text(el, "source") or default_source
+        source_url = next((c.get("url", "") for c in el if local(c.tag) == "source"), "")
         # Google ニュースのタイトル末尾の「 - 媒体名」を取り除く
         if source and title.endswith(f" - {source}"):
             title = title[: -len(f" - {source}")]
         published = parse_date(child_text(el, "pubDate") or child_text(el, "date"))
         if title and link:
-            items.append({"title": title, "link": link, "source": source, "published": published})
+            items.append({"title": title, "link": link, "source": source, "source_url": source_url, "published": published})
     return items
 
 
@@ -94,6 +95,14 @@ def normalize(title: str) -> str:
     return re.sub(r"[\s　「」『』【】（）()・、。!！?？:：\-－―]", "", title)
 
 
+def is_paywalled(item: dict) -> bool:
+    """有料会員限定の記事が多いメディアや、見出しに「会員限定」などとある記事を判定する。"""
+    where = " ".join([item["source"], item["source_url"], urllib.parse.urlparse(item["link"]).netloc])
+    return any(p in where for p in config.PAYWALL_SOURCES) or any(
+        w in item["title"] for w in config.PAYWALL_TITLE_WORDS
+    )
+
+
 def collect(seen_links: set[str], seen_titles: set[str]) -> list[dict]:
     feeds = [("Googleニュース", google_news_url(q)) for q in config.GOOGLE_NEWS_QUERIES]
     feeds += config.EXTRA_FEEDS
@@ -101,6 +110,7 @@ def collect(seen_links: set[str], seen_titles: set[str]) -> list[dict]:
     cutoff = now - timedelta(hours=config.LOOKBACK_HOURS)
 
     found: dict[str, dict] = {}
+    skipped = 0
     for name, url in feeds:
         try:
             items = parse_feed(fetch(url), name)
@@ -110,11 +120,15 @@ def collect(seen_links: set[str], seen_titles: set[str]) -> list[dict]:
         for it in items:
             if it["published"] and it["published"] < cutoff:
                 continue
+            if is_paywalled(it):
+                skipped += 1
+                continue
             key = normalize(it["title"])
             if it["link"] in seen_links or key in seen_titles or key in found:
                 continue
             found[key] = it
 
+    print(f"有料メディアの記事を {skipped} 件除外しました")
     items = sorted(found.values(), key=lambda x: x["published"] or now, reverse=True)
     return items[: config.MAX_CANDIDATES]
 
@@ -129,6 +143,7 @@ SYSTEM_PROMPT = f"""あなたは、医療・健康・福祉・自治体行政に
 - 国の動きだけでなく、各地の自治体のユニークな取り組みも入れ、地域が偏らないようにする
 - 同じ出来事を扱う記事は1本にまとめる
 - 芸能・スポーツ・事件事故のみの話題、広告的な記事は避ける
+- 読者は無料で読める記事だけを求めている。有料会員限定と思われる記事は選ばない
 - カテゴリは次から選ぶ: {"、".join(config.CATEGORIES)}
 
 注目ポイントについて:
