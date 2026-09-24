@@ -292,6 +292,18 @@ def render_page(date: datetime, result: dict, back: str) -> str:
 """
 
 
+def ai_failure_message(e: Exception) -> str:
+    text = str(e).lower()
+    if "credit balance" in text or "billing" in text:
+        return ("Anthropicのクレジット残高が不足しています。"
+                "https://console.anthropic.com/settings/billing でクレジットを追加してください。")
+    if "authentication" in text or "api key" in text or "401" in text:
+        return "AnthropicのAPIキーが無効です。キーを作り直して、GitHubのSecretsを更新してください。"
+    return ("AIの呼び出しに失敗しました（一時的な障害の可能性があります）。"
+            "続くようなら https://console.anthropic.com/settings/billing で残高を確認してください。"
+            f"［エラー内容: {str(e)[:150]}］")
+
+
 def render_email(date: datetime, result: dict, page_url: str) -> str:
     rows = []
     for n, it in enumerate(result["items"], 1):
@@ -303,10 +315,16 @@ def render_email(date: datetime, result: dict, page_url: str) -> str:
 <a href="{html.escape(it["link"])}" style="color:#1d2320;font-size:16px;font-weight:bold;text-decoration:none">{html.escape(it["headline"])}</a>
 {point}
 </td></tr>""")
+    warning_box = ""
+    if result.get("warning"):
+        warning_box = ('<div style="background:#fdecea;border:1px solid #f5c2c0;color:#8a1c14;'
+                       'padding:12px;border-radius:8px;margin-bottom:16px;font-size:14px">'
+                       '<b>⚠️ AIが使えなかったため、今日はキーワードで選んだニュースです。</b><br>'
+                       f'{html.escape(result["warning"])}</div>')
     link = f'<p style="margin-top:20px"><a href="{page_url}" style="color:#1f7a5c">Webで見る・過去の号</a></p>' if page_url else ""
     return f"""<!doctype html><html><body style="margin:0;background:#f6f7f5">
 <div style="max-width:620px;margin:0 auto;padding:20px 16px;font-family:sans-serif;background:#fff">
-<h1 style="font-size:20px;margin:0 0 4px">けさの医療・福祉ニュース</h1>
+{warning_box}<h1 style="font-size:20px;margin:0 0 4px">けさの医療・福祉ニュース</h1>
 <div style="color:#5d6862;font-size:13px">{date:%Y/%m/%d}</div>
 <p style="color:#5d6862;font-size:14px">{html.escape(result["overview"])}</p>
 <table width="100%" cellpadding="0" cellspacing="0">{"".join(rows)}</table>
@@ -356,15 +374,20 @@ def main() -> None:
     if not candidates:
         sys.exit("候補の記事が見つかりませんでした")
 
-    if args.no_ai or not os.environ.get("ANTHROPIC_API_KEY"):
-        print("キーワード採点で選定します")
+    warning = ""
+    if args.no_ai:
         result = select_without_ai(candidates)
+    elif not os.environ.get("ANTHROPIC_API_KEY"):
+        result = select_without_ai(candidates)
+        warning = "AnthropicのAPIキーが登録されていません。GitHubのSecretsに ANTHROPIC_API_KEY を登録してください。"
     else:
         try:
             result = select_with_claude(candidates)
         except Exception as e:
             print(f"[warn] AI 選定に失敗したためキーワード採点に切り替えます: {e}", file=sys.stderr)
             result = select_without_ai(candidates)
+            warning = ai_failure_message(e)
+    result["warning"] = warning
 
     stamp = today.strftime("%Y-%m-%d")
     (DOCS / "archive").mkdir(parents=True, exist_ok=True)
@@ -376,7 +399,8 @@ def main() -> None:
     base = os.environ.get("SITE_URL", "").rstrip("/")
     OUT.mkdir(exist_ok=True)
     (OUT / "email.html").write_text(render_email(today, result, f"{base}/archive/{stamp}.html" if base else ""), encoding="utf-8")
-    (OUT / "subject.txt").write_text(f"【けさの医療・福祉ニュース】{today:%m/%d} {result['items'][0]['headline'][:30]} ほか", encoding="utf-8")
+    alert = "⚠️AI停止中 " if warning else ""
+    (OUT / "subject.txt").write_text(f"{alert}【けさの医療・福祉ニュース】{today:%m/%d} {result['items'][0]['headline'][:30]} ほか", encoding="utf-8")
 
     for n, it in enumerate(result["items"], 1):
         print(f"{n}. [{it['category']}] {it['headline']}")
