@@ -27,7 +27,7 @@ def wait_until(hhmm: str) -> None:
     now = datetime.now(JST)
     target = now.replace(hour=h, minute=m, second=0, microsecond=0)
     seconds = (target - now).total_seconds()
-    if 0 < seconds < 2 * 3600:
+    if 0 < seconds < 4 * 3600:
         print(f"{hhmm} まで {int(seconds)} 秒待ちます")
         time.sleep(seconds)
 

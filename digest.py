@@ -403,10 +403,17 @@ def save_history(history: list[dict], date: datetime, items: list[dict]) -> None
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--no-ai", action="store_true", help="AI を使わずに選ぶ")
+    parser.add_argument("--once-per-day", action="store_true", help="今日すでに配信済みなら何もしない")
     args = parser.parse_args()
 
     today = datetime.now(JST)
     history = load_history()
+    if args.once_per_day and any(h["date"] == today.strftime("%Y-%m-%d") for h in history):
+        print("今日はすでに配信済みのため、何もしません")
+        if os.environ.get("GITHUB_OUTPUT"):
+            with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+                f.write("skip=true\n")
+        return
     candidates = collect({h["link"] for h in history}, {normalize(h["title"]) for h in history})
     print(f"候補: {len(candidates)} 件")
     if not candidates:

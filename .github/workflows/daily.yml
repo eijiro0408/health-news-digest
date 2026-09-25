@@ -2,13 +2,21 @@ name: 毎朝のニュース配信
 
 on:
   schedule:
-    # GitHub の定期実行は数分〜数十分遅れることがあるため、
-    # 6:30 (日本時間) に起動して準備し、7:00 ちょうどまで待ってから送信する
-    - cron: "30 21 * * *"
-  workflow_dispatch: # 手動実行ボタン（テスト用）
+    # GitHub の定期実行は混雑すると数時間遅れることがあるため、
+    # 4:00・5:00・6:00（日本時間）に予約を入れておき、最初に動いた回が準備して
+    # 7:00 まで待ってから送信する。あとから動いた回は「配信済み」なので何もしない
+    - cron: "0 19 * * *"
+    - cron: "0 20 * * *"
+    - cron: "0 21 * * *"
+  workflow_dispatch: # 手動実行ボタン（テスト用。押すとすぐ配信する）
 
 permissions:
   contents: write
+
+# 同時に2つ動かないよう、順番待ちにする
+concurrency:
+  group: daily-digest
+  cancel-in-progress: false
 
 jobs:
   digest:
@@ -26,13 +34,15 @@ jobs:
       - run: npm install -g @anthropic-ai/claude-code
 
       - name: ニュースを集めて選ぶ
+        id: digest
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
-        run: python digest.py
+        run: python digest.py ${{ github.event_name == 'schedule' && '--once-per-day' || '' }}
 
       - name: Web ページを更新
+        if: steps.digest.outputs.skip != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -41,9 +51,10 @@ jobs:
           git push
 
       - name: メールを送信
+        if: steps.digest.outputs.skip != 'true'
         env:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
-        # 手動実行のときは待たずにすぐ送る
+        # 定期実行のときは 7:00 まで待つ。手動実行のときは待たずにすぐ送る
         run: python send_mail.py ${{ github.event_name == 'schedule' && '--wait-until 07:00' || '' }}
