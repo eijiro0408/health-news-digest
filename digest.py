@@ -176,20 +176,59 @@ def schema() -> dict:
     }
 
 
-def select_with_claude(candidates: list[dict]) -> dict:
-    import anthropic
-
+def candidate_lines(candidates: list[dict]) -> str:
     lines = []
     for i, c in enumerate(candidates):
         when = c["published"].strftime("%m/%d %H:%M") if c["published"] else "日時不明"
         lines.append(f"[{i}] {c['title']}（{c['source']}・{when}）")
+    return "候補一覧:\n" + "\n".join(lines)
+
+
+def pick(result: dict, candidates: list[dict]) -> dict:
+    picked, used = [], set()
+    for it in result["items"]:
+        if 0 <= it["id"] < len(candidates) and it["id"] not in used:
+            used.add(it["id"])
+            picked.append({**candidates[it["id"]], **it})
+    if not picked:
+        raise RuntimeError("AI の回答に有効な記事がありませんでした")
+    result["items"] = picked[: config.DAILY_COUNT]
+    return result
+
+
+def select_with_claude_code(candidates: list[dict]) -> dict:
+    """Claude の Pro/Max プランの枠で選ぶ（公式の claude コマンドを使う）。"""
+    import subprocess
+
+    prompt = (SYSTEM_PROMPT + "\nツールは使わず、下の候補一覧だけを見て判断してください。\n\n"
+              + candidate_lines(candidates))
+    proc = subprocess.run(
+        ["claude", "-p", prompt, "--output-format", "json",
+         "--json-schema", json.dumps(schema(), ensure_ascii=False), "--max-turns", "5"],
+        capture_output=True, text=True, encoding="utf-8", timeout=900,
+    )
+    try:
+        data = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        raise RuntimeError(f"claude コマンドが失敗しました: {(proc.stderr or proc.stdout)[:300]}")
+    if data.get("is_error") or proc.returncode != 0:
+        raise RuntimeError(f"claude コマンドが失敗しました: {str(data.get('result', ''))[:300]}")
+    result = data.get("structured_output")
+    if not isinstance(result, dict):
+        text = str(data.get("result", ""))
+        result = json.loads(text[text.find("{"): text.rfind("}") + 1])
+    return pick(result, candidates)
+
+
+def select_with_claude(candidates: list[dict]) -> dict:
+    import anthropic
 
     client = anthropic.Anthropic()
     response = client.beta.messages.create(
         model=config.MODEL,
         max_tokens=16000,
         system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": "候補一覧:\n" + "\n".join(lines)}],
+        messages=[{"role": "user", "content": candidate_lines(candidates)}],
         output_config={"effort": "medium", "format": {"type": "json_schema", "schema": schema()}},
         betas=["server-side-fallback-2026-07-01"],
         fallbacks="default",
@@ -197,15 +236,7 @@ def select_with_claude(candidates: list[dict]) -> dict:
     if response.stop_reason == "refusal":
         raise RuntimeError("Claude が応答を拒否しました")
     text = next(b.text for b in response.content if b.type == "text")
-    result = json.loads(text)
-
-    picked, used = [], set()
-    for it in result["items"]:
-        if 0 <= it["id"] < len(candidates) and it["id"] not in used:
-            used.add(it["id"])
-            picked.append({**candidates[it["id"]], **it})
-    result["items"] = picked[: config.DAILY_COUNT]
-    return result
+    return pick(json.loads(text), candidates)
 
 
 KEYWORDS = {
@@ -294,6 +325,13 @@ def render_page(date: datetime, result: dict, back: str) -> str:
 
 def ai_failure_message(e: Exception) -> str:
     text = str(e).lower()
+    if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
+        if "limit" in text or "上限" in text:
+            return "Claudeの利用上限に達していました。時間がたてば自動で回復します。"
+        if "auth" in text or "token" in text or "401" in text or "login" in text:
+            return ("Proプランのトークンが無効か期限切れです。パソコンで claude setup-token を実行し、"
+                    "GitHubのSecretsの CLAUDE_CODE_OAUTH_TOKEN を更新してください。")
+        return f"Claudeの呼び出しに失敗しました（一時的な障害の可能性があります）。［エラー内容: {str(e)[:150]}］"
     if "credit balance" in text or "billing" in text:
         return ("Anthropicのクレジット残高が不足しています。"
                 "https://console.anthropic.com/settings/billing でクレジットを追加してください。")
@@ -377,12 +415,15 @@ def main() -> None:
     warning = ""
     if args.no_ai:
         result = select_without_ai(candidates)
-    elif not os.environ.get("ANTHROPIC_API_KEY"):
+    elif not (os.environ.get("CLAUDE_CODE_OAUTH_TOKEN") or os.environ.get("ANTHROPIC_API_KEY")):
         result = select_without_ai(candidates)
-        warning = "AnthropicのAPIキーが登録されていません。GitHubのSecretsに ANTHROPIC_API_KEY を登録してください。"
+        warning = ("Claudeの認証情報が登録されていません。GitHubのSecretsに "
+                   "CLAUDE_CODE_OAUTH_TOKEN（Proプラン）か ANTHROPIC_API_KEY を登録してください。")
     else:
+        # Pro/Max プランのトークンがあればそちらを優先（追加料金なし）
+        select = select_with_claude_code if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN") else select_with_claude
         try:
-            result = select_with_claude(candidates)
+            result = select(candidates)
         except Exception as e:
             print(f"[warn] AI 選定に失敗したためキーワード採点に切り替えます: {e}", file=sys.stderr)
             result = select_without_ai(candidates)
