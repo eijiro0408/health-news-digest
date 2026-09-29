@@ -54,7 +54,20 @@ PAYWALL_SOURCES = [
     "medical.nikkeibp.co.jp", "日経メディカル", "nikkeibp.co.jp", "日経BP", "m3.com",
     "mixonline.jp", "ミクスOnline", "jiho.jp", "じほう", "business.nikkei.com", "日経ビジネス",
     "nikkei.co.jp", "日経Gooday", "carenet.com", "CareNet",
+    # 2026-09-29 に混ざった地方紙と、同じように有料会員制の多い地方紙・専門紙
+    "nankainn.com", "hokuroku.co.jp", "minato-yamaguchi.co.jp", "ubenippo.co.jp",
+    "kushironews.jp", "tokachi.co.jp", "tomamin.co.jp", "muromin.jp", "daily-tohoku.co.jp",
+    "mutusinpou.co.jp", "iwanichi.co.jp", "shonai-nippo.co.jp", "minpo.jp", "minyu-net.com",
+    "webun.jp", "sannichi.co.jp", "shimintimes.co.jp", "nara-np.co.jp", "agara.co.jp",
+    "isenp.co.jp", "nnn.co.jp", "shikoku-np.co.jp", "saga-s.co.jp", "y-mainichi.co.jp",
+    "yaeyama-nippo.co.jp", "hakodate-np.co.jp", "hokuu.co.jp", "senyonews.jp",
+    "agrinews.co.jp", "yakuji.co.jp", "jmedj.co.jp", "fukushishimbun.com", "nikkan.co.jp",
+    "kensetsunews.com", "decn.co.jp", "silver-news.com", "上越タイムス", "joetsutj.com",
 ]
+
+# メディア名にこの言葉が入っていれば、新聞社のサイトとみなして除外する
+# （同じ記事でも Yahoo!ニュースや47NEWS経由なら無料で読めるので、そちらは残る）
+PAYWALL_NAME_WORDS = ["新聞", "日報", "新報", "民報"]
 
 # 見出しにこの言葉があれば有料記事とみなして除外する
 PAYWALL_TITLE_WORDS = ["会員限定", "有料会員", "有料記事", "プレミアム記事", "購読者限定"]

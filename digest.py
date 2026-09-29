@@ -98,8 +98,10 @@ def normalize(title: str) -> str:
 def is_paywalled(item: dict) -> bool:
     """有料会員限定の記事が多いメディアや、見出しに「会員限定」などとある記事を判定する。"""
     where = " ".join([item["source"], item["source_url"], urllib.parse.urlparse(item["link"]).netloc])
-    return any(p in where for p in config.PAYWALL_SOURCES) or any(
-        w in item["title"] for w in config.PAYWALL_TITLE_WORDS
+    return (
+        any(p in where for p in config.PAYWALL_SOURCES)
+        or any(w in item["source"] for w in config.PAYWALL_NAME_WORDS)
+        or any(w in item["title"] for w in config.PAYWALL_TITLE_WORDS)
     )
 
 
@@ -212,7 +214,10 @@ def select_with_claude_code(candidates: list[dict]) -> dict:
     except json.JSONDecodeError:
         raise RuntimeError(f"claude コマンドが失敗しました: {(proc.stderr or proc.stdout)[:300]}")
     if data.get("is_error") or proc.returncode != 0:
-        raise RuntimeError(f"claude コマンドが失敗しました: {str(data.get('result', ''))[:300]}")
+        raise RuntimeError(
+            f"claude コマンドが失敗しました: {str(data.get('result', ''))[:300]}"
+            f"（status={data.get('api_error_status')}, reason={data.get('terminal_reason')}）"
+        )
     result = data.get("structured_output")
     if not isinstance(result, dict):
         text = str(data.get("result", ""))
@@ -328,9 +333,10 @@ def ai_failure_message(e: Exception) -> str:
     if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
         if "limit" in text or "上限" in text:
             return "Claudeの利用上限に達していました。時間がたてば自動で回復します。"
-        if "auth" in text or "token" in text or "401" in text or "login" in text:
+        if "401" in text or "authenticate" in text or "not logged in" in text:
             return ("Proプランのトークンが無効か期限切れです。パソコンで claude setup-token を実行し、"
-                    "GitHubのSecretsの CLAUDE_CODE_OAUTH_TOKEN を更新してください。")
+                    "GitHubのSecretsの CLAUDE_CODE_OAUTH_TOKEN を更新してください。"
+                    f"［エラー内容: {str(e)[:150]}］")
         return f"Claudeの呼び出しに失敗しました（一時的な障害の可能性があります）。［エラー内容: {str(e)[:150]}］"
     if "credit balance" in text or "billing" in text:
         return ("Anthropicのクレジット残高が不足しています。"
