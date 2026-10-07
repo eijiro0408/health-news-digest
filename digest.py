@@ -32,6 +32,9 @@ DOCS = ROOT / "docs"
 OUT = ROOT / "out"
 HISTORY_FILE = DOCS / "data" / "history.json"
 USER_AGENT = "Mozilla/5.0 (compatible; health-news-digest/1.0)"
+# 記事ページはブラウザと同じ表示を確認したいので、一般的なブラウザ名で開く
+BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/140.0 Safari/537.36")
 
 
 # ---------------------------------------------------------------- 収集
@@ -138,7 +141,8 @@ def collect(seen_links: set[str], seen_titles: set[str]) -> list[dict]:
 # ---------------------------------------------------------------- 選定
 
 SYSTEM_PROMPT = f"""あなたは、医療・健康・福祉・自治体行政に携わる人向けの朝刊ニュースの編集者です。
-候補の見出し一覧から、今朝読むべきニュースを{config.DAILY_COUNT}本選んでください。
+候補の見出し一覧から、今朝読むべきニュースを優先度の高い順に{config.DAILY_COUNT + config.SPARE_COUNT}本選んでください。
+（上位{config.DAILY_COUNT}本が本命、残りは有料記事だった場合の予備です。導入文は全体の傾向を書いてください）
 
 選び方:
 - 現場や住民の暮らしに影響する制度改正・予算・通知・調査結果・新しい取り組みを優先する
@@ -194,8 +198,66 @@ def pick(result: dict, candidates: list[dict]) -> dict:
             picked.append({**candidates[it["id"]], **it})
     if not picked:
         raise RuntimeError("AI の回答に有効な記事がありませんでした")
-    result["items"] = picked[: config.DAILY_COUNT]
+    result["items"] = picked  # 本数をしぼるのは、記事ページを確認したあと（keep_free_articles）
     return result
+
+
+# ---------------------------------------------------------------- 有料記事の確認
+
+def resolve_google_news(url: str) -> str:
+    """Google ニュースの転送用リンクから、元の記事の URL を取り出す。"""
+    if "news.google.com" not in url:
+        return url
+    article_id = urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]
+    page = fetch(f"https://news.google.com/rss/articles/{article_id}?hl=ja&gl=JP&ceid=JP:ja").decode("utf-8", "replace")
+    sig = re.search(r'data-n-a-sg="([^"]+)"', page).group(1)
+    ts = re.search(r'data-n-a-ts="([^"]+)"', page).group(1)
+    inner = ["garturlreq", [["X", "X", ["X", "X"], None, None, 1, 1, "US:en", None, 1, None, None, None,
+                             None, None, 0, 1], "X", "X", 1, [1, 1, 1], 1, 1, None, 0, 0, None, 0],
+             article_id, int(ts), sig]
+    body = urllib.parse.urlencode({"f.req": json.dumps([[["Fbv4je", json.dumps(inner), None, "generic"]]])}).encode()
+    req = urllib.request.Request(
+        "https://news.google.com/_/DotsSplashUi/data/batchexecute", data=body,
+        headers={"User-Agent": BROWSER_UA, "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"},
+    )
+    with urllib.request.urlopen(req, timeout=30) as res:
+        text = res.read().decode("utf-8")
+    return json.loads(json.loads(text.split("\n\n", 1)[1])[0][2])[1]
+
+
+def article_status(item: dict) -> str:
+    """記事ページを開いて "free" / "paid" / "unknown"（開けなかった）を返す。リンクは元記事に置き換える。"""
+    try:
+        url = resolve_google_news(item["link"])
+        item["link"] = url
+        if any(p in url for p in config.PAYWALL_SOURCES):
+            return "paid"
+        req = urllib.request.Request(url, headers={"User-Agent": BROWSER_UA})
+        with urllib.request.urlopen(req, timeout=30) as res:
+            page = res.read().decode("utf-8", "replace")
+    except Exception as e:
+        print(f"[warn] 記事ページを確認できませんでした: {item['title'][:30]} ({e})", file=sys.stderr)
+        return "unknown"
+    page = re.sub(r"<script.*?</script>|<style.*?</style>", "", page, flags=re.S)
+    if any(m in page for m in config.PAYWALL_PAGE_MARKERS) or re.search(r"残り\s*[0-9,０-９]+\s*文?字", page):
+        return "paid"
+    return "free"
+
+
+def keep_free_articles(items: list[dict]) -> list[dict]:
+    """優先順に記事ページを確認し、無料で読めるものを DAILY_COUNT 本そろえる。"""
+    free, unknown = [], []
+    for it in items:
+        if len(free) >= config.DAILY_COUNT:
+            break
+        status = article_status(it)
+        print(f"  {status:7} {it['title'][:40]}")
+        if status == "free":
+            free.append(it)
+        elif status == "unknown":
+            unknown.append(it)
+    # 確認できなかった記事は、無料の記事が足りないときだけ使う
+    return (free + unknown)[: config.DAILY_COUNT]
 
 
 def select_with_claude_code(candidates: list[dict]) -> dict:
@@ -264,7 +326,7 @@ def select_without_ai(candidates: list[dict]) -> dict:
     scored.sort(key=lambda x: x[0], reverse=True)
     items = [
         {**c, "category": cat, "region": "", "headline": c["title"], "point": ""}
-        for _, cat, c in scored[: config.DAILY_COUNT]
+        for _, cat, c in scored[: config.DAILY_COUNT + config.SPARE_COUNT]
     ]
     return {"overview": "キーワードで自動選定したニュースです。", "items": items}
 
@@ -442,6 +504,11 @@ def main() -> None:
             result = select_without_ai(candidates)
             warning = ai_failure_message(e)
     result["warning"] = warning
+
+    print("記事ページを開いて、無料で読めるか確認します")
+    result["items"] = keep_free_articles(result["items"])
+    if not result["items"]:
+        sys.exit("無料で読める記事が見つかりませんでした")
 
     stamp = today.strftime("%Y-%m-%d")
     (DOCS / "archive").mkdir(parents=True, exist_ok=True)

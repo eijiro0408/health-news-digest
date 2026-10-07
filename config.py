@@ -3,6 +3,9 @@
 # 1日に配信するニュースの本数
 DAILY_COUNT = 7
 
+# AI に選ばせる予備の本数（有料記事だった場合の入れ替え用）
+SPARE_COUNT = 5
+
 # 何時間前までのニュースを候補にするか
 LOOKBACK_HOURS = 30
 
@@ -63,6 +66,17 @@ PAYWALL_SOURCES = [
     "yaeyama-nippo.co.jp", "hakodate-np.co.jp", "hokuu.co.jp", "senyonews.jp",
     "agrinews.co.jp", "yakuji.co.jp", "jmedj.co.jp", "fukushishimbun.com", "nikkan.co.jp",
     "kensetsunews.com", "decn.co.jp", "silver-news.com", "上越タイムス", "joetsutj.com",
+    # 2026-10 に混ざったもの
+    "daily-tohoku", "デーリー東北", "jbpress.ismedia.jp", "JBpress",
+]
+
+# 記事ページにこの表示があれば「冒頭だけ無料・続きは会員登録や有料」とみなして除外する
+# （47NEWS は冒頭だけ載せて「記事全文を読む」で地方紙の有料サイトへ飛ばす形）
+PAYWALL_PAGE_MARKERS = [
+    "記事全文を読む", "この記事は会員限定", "会員限定記事", "有料会員限定", "有料会員になると",
+    "続きは会員", "続きをお読みいただくには", "この続きを読むには", "この記事の続きを読むには",
+    "この続きをみるには", "購読者限定", "会員登録すると続き", "ログインすると続き",
+    "ログインして続きを読む", "無料会員登録で続き", "有料記事",
 ]
 
 # メディア名にこの言葉が入っていれば、新聞社のサイトとみなして除外する
