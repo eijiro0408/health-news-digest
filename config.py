@@ -68,6 +68,8 @@ PAYWALL_SOURCES = [
     "kensetsunews.com", "decn.co.jp", "silver-news.com", "上越タイムス", "joetsutj.com",
     # 2026-10 に混ざったもの
     "daily-tohoku", "デーリー東北", "jbpress.ismedia.jp", "JBpress",
+    # NHK ONE の登録が必要
+    "NHK", "web.nhk", "nhk.or.jp", "nhk.jp",
 ]
 
 # 記事ページにこの表示があれば「冒頭だけ無料・続きは会員登録や有料」とみなして除外する
