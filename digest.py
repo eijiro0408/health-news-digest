@@ -472,16 +472,27 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--no-ai", action="store_true", help="AI を使わずに選ぶ")
     parser.add_argument("--once-per-day", action="store_true", help="今日すでに配信済みなら何もしない")
+    parser.add_argument("--not-before", help="この時刻（日本時間、例 01:15）より前に動いたら何もしない。"
+                        "GitHub の実行は最長6時間なので、早すぎると 7:00 まで待ちきれないため")
     args = parser.parse_args()
 
     today = datetime.now(JST)
     history = load_history()
-    if args.once_per_day and any(h["date"] == today.strftime("%Y-%m-%d") for h in history):
-        print("今日はすでに配信済みのため、何もしません")
+
+    def skip(reason: str) -> None:
+        print(reason)
         if os.environ.get("GITHUB_OUTPUT"):
             with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
                 f.write("skip=true\n")
+
+    if args.once_per_day and any(h["date"] == today.strftime("%Y-%m-%d") for h in history):
+        skip("今日はすでに配信済みのため、何もしません")
         return
+    if args.not_before:
+        h, m = map(int, args.not_before.split(":"))
+        if (today.hour, today.minute) < (h, m):
+            skip(f"{today:%H:%M} は {args.not_before} より前で、7:00 まで待ちきれないため、次の回にまかせます")
+            return
     candidates = collect({h["link"] for h in history}, {normalize(h["title"]) for h in history})
     print(f"候補: {len(candidates)} 件")
     if not candidates:

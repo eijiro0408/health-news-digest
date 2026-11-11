@@ -2,13 +2,26 @@ name: 毎朝のニュース配信
 
 on:
   schedule:
-    # GitHub の定期実行は混雑すると数時間（最大5時間ほど）遅れることがあるため、
-    # 1:30・3:00・4:30・6:00（日本時間）に予約を入れておき、最初に動いた回が準備して
-    # 7:00 まで待ってから送信する。あとから動いた回は「配信済み」なので何もしない
-    - cron: "30 16 * * *"
-    - cron: "0 18 * * *"
-    - cron: "30 19 * * *"
-    - cron: "0 21 * * *"
+    # GitHub の定期実行は、このリポジトリでは予約より4〜8時間おそく動いたり、
+    # まるごととばされたりしている（2026年11月の記録）。そこで:
+    # - 前の日の夜 19:07 から朝 6:37（日本時間）まで、1時間ごとに予約を入れる
+    #   （ちょうど0分・30分は混むので、7分・37分にずらす）
+    # - 1:15 より後に最初に動いた回が準備して、7:00 まで待ってから送る
+    # - 1:15 より前に動いた回は、7:00 まで待ちきれない（最長6時間）ので何もしない
+    # - あとから動いた回は「配信済み」なので何もしない
+    - cron: "7 10 * * *"   # 日本時間 19:07
+    - cron: "7 11 * * *"   # 日本時間 20:07
+    - cron: "7 12 * * *"   # 日本時間 21:07
+    - cron: "7 13 * * *"   # 日本時間 22:07
+    - cron: "7 14 * * *"   # 日本時間 23:07
+    - cron: "7 15 * * *"   # 日本時間 0:07
+    - cron: "7 16 * * *"   # 日本時間 1:07
+    - cron: "7 17 * * *"   # 日本時間 2:07
+    - cron: "7 18 * * *"   # 日本時間 3:07
+    - cron: "7 19 * * *"   # 日本時間 4:07
+    - cron: "7 20 * * *"   # 日本時間 5:07
+    - cron: "7 21 * * *"   # 日本時間 6:07
+    - cron: "37 21 * * *"   # 日本時間 6:37
   workflow_dispatch: # 手動実行ボタン（テスト用。押すとすぐ配信する）
 
 permissions:
@@ -41,7 +54,7 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
-        run: python digest.py ${{ github.event_name == 'schedule' && '--once-per-day' || '' }}
+        run: python digest.py ${{ github.event_name == 'schedule' && '--once-per-day --not-before 01:15' || '' }}
 
       - name: Web ページを更新
         if: steps.digest.outputs.skip != 'true'
