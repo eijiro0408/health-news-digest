@@ -1,40 +1,5 @@
 [
  {
-  "date": "2026-11-05",
-  "link": "https://www.jiji.com/jc/article?k=2026110401151&g=eco",
-  "title": "高齢者窓口負担、原則３割へ 現役世代の負担軽減で―財政審"
- },
- {
-  "date": "2026-11-05",
-  "link": "https://www.joint-kaigo.com/articles/50163/",
-  "title": "介護の2割負担、対象拡大を要求 財務省「早急に結論を」 金融資産の反映も"
- },
- {
-  "date": "2026-11-05",
-  "link": "https://www.joint-kaigo.com/articles/50151/",
-  "title": "集合住宅への訪問介護・通所介護、報酬引き下げを 財務省が要求 訪問看護の適正化も｜来年度改定"
- },
- {
-  "date": "2026-11-05",
-  "link": "https://newsdig.tbs.co.jp/articles/-/3062126",
-  "title": "12人から計13万円 山口県岩国市が介護保険料を過大徴収 プログラムに誤り"
- },
- {
-  "date": "2026-11-05",
-  "link": "https://article.auone.jp/55d139ce-ed4a-493e-bc8c-d6e6ed661f92",
-  "title": "自治体のシステム移行で委託先が高額請求 公正取引委員会が実態調査"
- },
- {
-  "date": "2026-11-05",
-  "link": "https://gemmed.ghc-j.com/?p=77488",
-  "title": "2024年度の国民医療費は48兆8100億円、1人当たり医療費に大きな地域格差あり最高の高知と最低の埼玉とで1.44倍の開き―厚労省"
- },
- {
-  "date": "2026-11-05",
-  "link": "https://news.yahoo.co.jp/articles/721ed25f70965f3b1159511c52bec5f37e45e248",
-  "title": "インフル「注意報」目前に 長野県内で1医療機関あたり9.96人 2週ぶり増 14歳以下の感染が7割（NBS長野放送）"
- },
- {
   "date": "2026-11-06",
   "link": "https://medical.jiji.com/news/61738",
   "title": "高齢者窓口負担、年内に工程＝「６５歳」定義も議論―政府会議"
@@ -523,5 +488,40 @@
   "date": "2026-11-19",
   "link": "https://web.pref.hyogo.lg.jp/hsk05/20261126daihyousyakai.html",
   "title": "令和8年度地域医療構想調整会議阪神圏域代表者会の開催"
+ },
+ {
+  "date": "2026-11-20",
+  "link": "https://news.tv-asahi.co.jp/news_society/articles/000549107.html",
+  "title": "脊髄損傷の再生医療製品が薬事本承認 “条件付き”からの取得は初"
+ },
+ {
+  "date": "2026-11-20",
+  "link": "https://news.yahoo.co.jp/articles/a180d113ff7b64870d49de3173c7d6f8a21fc189",
+  "title": "厚労省 がん患者に再生医療など提供の「医療法人社団ICVS東京クリニック」に一時停止命令 患者に治療との関連が疑われる重篤な病気が複数発生したことを確認（ABEMA TIMES）"
+ },
+ {
+  "date": "2026-11-20",
+  "link": "https://www.joint-kaigo.com/articles/50589/",
+  "title": "介護報酬改定、基本報酬を重点に引き上げを 自民議連が決議 賃上げ財源の確保も"
+ },
+ {
+  "date": "2026-11-20",
+  "link": "https://news.yahoo.co.jp/articles/dc09b1ce52ea4c3bd20fd3b67030520355d16a60",
+  "title": "ＯＴＣ類似薬の一部 保険適用外まで３カ月 県医師会が患者の安全めぐり懸念示す（奈良テレビ放送）"
+ },
+ {
+  "date": "2026-11-20",
+  "link": "https://news.yahoo.co.jp/articles/540f654cba811a5c084e0012c343912ce3905b7a",
+  "title": "【今季初のインフルエンザ警報】患者数は1医療機関あたり30.63人に…ここ10年で最も早い発令_休校6校・学級閉鎖170校超―17保健所管内で感染拡大〈北海道〉"
+ },
+ {
+  "date": "2026-11-20",
+  "link": "https://www.city.hachinohe.aomori.jp/kenko_fukushi/fukushi_kaigo/shogaishafukushi/26995.html",
+  "title": "【仮称】八戸市障がいを理由とする差別の解消の推進に関する条例の骨子（案）への意見を募集します"
+ },
+ {
+  "date": "2026-11-20",
+  "link": "https://news.yahoo.co.jp/articles/44be0c808b382c1367418c66a5277f099ea75263",
+  "title": "新病院の概算工事費９３０億円見通し ４つの医療機関を統合し整備 広島市東区に２０３０年度開院予定（テレビ新広島）"
  }
 ]
